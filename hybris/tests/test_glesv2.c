@@ -22,6 +22,22 @@
 #include <math.h>
 #include <stddef.h>
 
+#define WIDTH  800
+#define HEIGHT 600
+
+#ifdef MALI_FRAMEBUFFER_EGL
+#include <linux/fb.h>
+#include <sys/ioctl.h>
+#include <fcntl.h>
+struct mali_native_window native_window = {
+	.width = WIDTH,
+	.height = HEIGHT,
+};
+#define NATIVE_WINDOW ((EGLNativeWindowType)&native_window)
+#else
+#define NATIVE_WINDOW ((EGLNativeWindowType)NULL)
+#endif
+
 const char vertex_src [] =
 "                                        \
    attribute vec4        position;       \
@@ -82,6 +98,9 @@ const float vertexArray[] = {
 
 int main(int argc, char **argv)
 {
+#ifdef MALI_FRAMEBUFFER_EGL
+	int fb = open("/dev/fb0", O_RDWR);
+#endif
 	EGLDisplay display;
 	EGLConfig ecfg;
 	EGLint num_config;
@@ -112,7 +131,7 @@ int main(int argc, char **argv)
 	assert(eglGetError() == EGL_SUCCESS);
 	assert(rv == EGL_TRUE);
 
-	surface = eglCreateWindowSurface((EGLDisplay) display, ecfg, (EGLNativeWindowType)NULL, NULL);
+	surface = eglCreateWindowSurface((EGLDisplay) display, ecfg, NATIVE_WINDOW, NULL);
 	assert(eglGetError() == EGL_SUCCESS);
 	assert(surface != EGL_NO_SURFACE);
 
@@ -145,7 +164,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	glViewport ( 0 , 0 , 800, 600);
+	glViewport ( 0 , 0 , WIDTH, HEIGHT);
 	glClearColor ( 0.08 , 0.06 , 0.07 , 1.);    // background color
 	float phase = 0;
 	while (1) {
@@ -159,6 +178,10 @@ int main(int argc, char **argv)
 		glDrawArrays ( GL_TRIANGLE_STRIP, 0, 5 );
 
 		eglSwapBuffers ( (EGLDisplay) display, surface );  // get the rendered buffer to the screen
+#ifdef MALI_FRAMEBUFFER_EGL
+		/* Do FBIO_WAITFORVSYNC here to match libhybris framebuffer EGL */
+		ioctl(fb, FBIO_WAITFORVSYNC, 0);
+#endif
 	}
 
 	printf("stop\n");
