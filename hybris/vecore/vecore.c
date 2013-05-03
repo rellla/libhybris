@@ -17,6 +17,7 @@
 #include <dlfcn.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <string.h>
 
 #include <hybris/internal/binding.h>
 
@@ -28,23 +29,11 @@
 #define u32            uint32_t
 #define u64            uint64_t
 
-HYBRIS_LIBRARY_INITIALIZE(cedarxosal, "/system/lib/libcedarxosal.so");
-HYBRIS_LIBRARY_INITIALIZE(vecore,     "/system/lib/libve.so");
+HYBRIS_LIBRARY_INITIALIZE(cedarv_base,    "/system/lib/libcedarv_base.so");
+HYBRIS_LIBRARY_INITIALIZE(cedarv_adapter, "/system/lib/libcedarv_adapter.so");
+HYBRIS_LIBRARY_INITIALIZE(vecore,         "/system/lib/libve.so");
 
-/*
- * HACK: make sure that cedarx_hardware_init() is called before libve_open(),
- *       otherwise we are in a bigger trouble and libve_open() segfaults.
- */
-Handle libve_open(vconfig_t* a, vstream_info_t* b, void* c)
-{
-    static Handle (*real_libve_open)(vconfig_t*, vstream_info_t*, void*) = NULL;
-    static void (*cedarx_hardware_init)() = NULL;
-    HYBRIS_DLSYSM(vecore, &real_libve_open, "libve_open");
-    HYBRIS_DLSYSM(cedarxosal, &cedarx_hardware_init, "cedarx_hardware_init");
-    cedarx_hardware_init();
-    return real_libve_open(a, b, c);
-}
-
+HYBRIS_IMPLEMENT_FUNCTION3(vecore, Handle,    libve_open, vconfig_t*, vstream_info_t*, void*);
 HYBRIS_IMPLEMENT_FUNCTION2(vecore, vresult_e, libve_close, u8, Handle);
 HYBRIS_IMPLEMENT_FUNCTION2(vecore, vresult_e, libve_reset, u8, Handle);
 HYBRIS_IMPLEMENT_FUNCTION2(vecore, vresult_e, libve_flush, u8, Handle);
@@ -59,8 +48,36 @@ HYBRIS_IMPLEMENT_FUNCTION2(vecore, vresult_e, libve_get_stream_info, vstream_inf
 HYBRIS_IMPLEMENT_FUNCTION1(vecore, u8*,       libve_get_version, Handle);
 HYBRIS_IMPLEMENT_FUNCTION1(vecore, u8*,       libve_get_last_error, Handle);
 
-/* These don't seem to be available in Android */
-HYBRIS_IMPLEMENT_FUNCTION1(vecore, vresult_e, libve_set_ive, void*);
-HYBRIS_IMPLEMENT_FUNCTION1(vecore, vresult_e, libve_set_ios, void*);
-HYBRIS_IMPLEMENT_FUNCTION1(vecore, vresult_e, libve_set_ifbm, void*);
-HYBRIS_IMPLEMENT_FUNCTION1(vecore, vresult_e, libve_set_ivbv, void*);
+/* Overwrite the corresponding interface structures */
+
+vresult_e libve_set_ive(void *new_ive)
+{
+    static void *IVE;
+    HYBRIS_DLSYSM(cedarv_adapter, &IVE, "IVE");
+    memcpy(IVE, new_ive, 6 * 4);
+    return 0;
+}
+
+vresult_e libve_set_ios(void *new_ios)
+{
+    static void *IOS;
+    HYBRIS_DLSYSM(cedarv_adapter, &IOS, "IOS");
+    memcpy(IOS, new_ios, 10 * 4);
+    return 0;
+}
+
+vresult_e libve_set_ifbm(void *new_ifbm)
+{
+    static void *IFBM;
+    HYBRIS_DLSYSM(cedarv_base, &IFBM, "IFBM");
+    memcpy(IFBM, new_ifbm, 5 * 4);
+    return 0;
+}
+
+vresult_e libve_set_ivbv(void *new_ivbv)
+{
+    static void *IVBV;
+    HYBRIS_DLSYSM(cedarv_base, &IVBV, "IVBV");
+    memcpy(IVBV, new_ivbv, 5 * 4);
+    return 0;
+}
