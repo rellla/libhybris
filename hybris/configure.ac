@@ -131,6 +131,7 @@ AC_CONFIG_FILES([
 	glesv2/Makefile
 	hardware/Makefile
 	ui/Makefile
+	vecore/Makefile
 	include/Makefile
 	tests/Makefile
 ])
