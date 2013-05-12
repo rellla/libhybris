@@ -48,6 +48,34 @@ HYBRIS_IMPLEMENT_FUNCTION2(vecore, vresult_e, libve_get_stream_info, vstream_inf
 HYBRIS_IMPLEMENT_FUNCTION1(vecore, u8*,       libve_get_version, Handle);
 HYBRIS_IMPLEMENT_FUNCTION1(vecore, u8*,       libve_get_last_error, Handle);
 
+/*
+ * The libve library ABI is unfortunately unstable and suffers from
+ * pointless changes from time to time. One of such changes is the
+ * reshuffling of arguments for 'fbm_init_ex' function (the introduction
+ * of 'dummy' argument, which seems to be always NULL). We mitigate this
+ * problem by introducing a thunk function, which emulates calling
+ * conventions used in the linux armhf libvecore blob.
+ */
+
+static Handle (*real_fbm_init_ex)(u32 max_frame_num,
+            u32 min_frame_num, u32 size_y[2],
+            u32 size_u[2], u32 size_v[2],
+            u32 size_alpha[2], u32 out_3d_mode,
+            u32 format, void* parent);
+
+static Handle fbm_init_ex_thunk(u32 max_frame_num,
+            u32 min_frame_num, u32 size_y[2],
+            u32 size_u[2], u32 size_v[2],
+            u32 size_alpha[2], u32 out_3d_mode,
+            u32 format, void *dummy, void* parent)
+{
+    return real_fbm_init_ex(max_frame_num,
+            min_frame_num, size_y,
+            size_u, size_v,
+            size_alpha, out_3d_mode,
+            format, parent);
+}
+
 /* Overwrite the corresponding interface structures */
 
 vresult_e libve_set_ive(void *new_ive)
@@ -68,9 +96,11 @@ vresult_e libve_set_ios(void *new_ios)
 
 vresult_e libve_set_ifbm(void *new_ifbm)
 {
-    static void *IFBM;
+    static void **IFBM;
     HYBRIS_DLSYSM(cedarv_base, &IFBM, "IFBM");
     memcpy(IFBM, new_ifbm, 5 * 4);
+    real_fbm_init_ex = IFBM[4];
+    IFBM[4] = fbm_init_ex_thunk;
     return 0;
 }
 
