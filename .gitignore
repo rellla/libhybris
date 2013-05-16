@@ -34,3 +34,4 @@ hybris/tests/test_lights
 hybris/tests/test_offscreen_rendering
 hybris/tests/test_sensors
 hybris/tests/test_ui
+hybris/tests/test_gps

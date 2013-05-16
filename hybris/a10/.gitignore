@@ -1,0 +1,5 @@
+.downloaded
+*.tar.gz
+tmp
+android/system
+!Makefile
